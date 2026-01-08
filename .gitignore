@@ -1,0 +1,20 @@
+# GIS-related files
+*.gdb
+*.sde
+*.aprx
+*.atbx
+.backups/
+GpMessages/
+ImportLog/
+Index/
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints
+
+# Other directories
+Data/
+Output/
+RasterFunctionTemplates/
+
+# Python
+.pyHistory
