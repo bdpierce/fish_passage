@@ -17,7 +17,6 @@ def create_scratch_ws():
     #print("----- Creating scratch FGDB ... ")
         gdb_name = "scratch.gdb"
         username = os.getlogin()
-        #ws_dir = os.path.join(r"c:\Users",username,r"AppDate\Local\Temp") # AppDate should be AppData??
         ws_dir = os.path.join(r"c:\Users",username,r"AppData\Local\Temp")
         if not os.path.exists(ws_dir):
             os.makedirs(ws_dir)
@@ -152,7 +151,7 @@ def add_barrier_at_start(start_point, barrier_layer):
 
         if int(arcpy.management.GetCount("temp_view")[0]) > 0:
             export_barrier("temp_view", tmp_barrier)
-            with arcpy.da.SearchCursor(tmp_barrier, ['SiteID', 'FishPass']) as cursor:
+            with arcpy.da.SearchCursor(tmp_barrier, ['SiteId', 'FishPass']) as cursor:
                 for row in cursor:
                     lstDownBarriers.append(f"{row[0]} ({get_barrier_type(row[1])})")
                     dict_streamlen_by_barrier [row[0]] = 0
@@ -254,7 +253,7 @@ def trace_downstream(TC_Network, start_point, barrier_layer, lstDownBarriers_m):
         if cnt_barriers == 0:
             return lstDownBarriers_m
         elif cnt_barriers == 1:
-            with arcpy.da.SearchCursor(tmp_barrier, ['SiteID', 'FishPass']) as cursor:
+            with arcpy.da.SearchCursor(tmp_barrier, ['SiteId', 'FishPass']) as cursor:
                 for row in cursor:
                     print(f"less than 2: {row[0]} ({get_barrier_type(row[1])})")
                     lstDownBarriers_m.append(f"{row[0]} ({get_barrier_type(row[1])})")
@@ -262,29 +261,29 @@ def trace_downstream(TC_Network, start_point, barrier_layer, lstDownBarriers_m):
             return trace_downstream(TC_Network, start_p, barriers_fc, lstDownBarriers_m)
         else:
             smallest_river_order = None
-            final_ba_SiteID = ''
+            final_ba_SiteId = ''
             final_ba_Type = ''
-            ba_SiteIDs = []
+            ba_SiteIds = []
             seg_ids_remove = []
-            with arcpy.da.SearchCursor(tmp_barrier, ["SiteID", "FishPass"]) as ba_cursor:
+            with arcpy.da.SearchCursor(tmp_barrier, ["SiteId", "FishPass"]) as ba_cursor:
                 for ba in ba_cursor:
-                    ba_SiteIDs.append(ba[0])
-            for ba_SiteID in ba_SiteIDs:
+                    ba_SiteIds.append(ba[0])
+            for ba_SiteId in ba_SiteIds:
                 arcpy.management.MakeFeatureLayer(tmp_barrier, "temp_view")
-                arcpy.management.SelectLayerByAttribute("temp_view", 'NEW_SELECTION', f"SiteId = '{ba_SiteID}'")
+                arcpy.management.SelectLayerByAttribute("temp_view", 'NEW_SELECTION', f"SiteId = '{ba_SiteId}'")
                 arcpy.management.SelectLayerByLocation(lyr_stream_end, "INTERSECT", "temp_view")
                 with arcpy.da.SearchCursor(lyr_stream_end, ["STREAMORDER"]) as river_cursor:
                     for river in river_cursor:
                         river_order = river[0]
                         if smallest_river_order is None or river_order < smallest_river_order:
                             smallest_river_order = river_order
-                            final_ba_SiteID = ba_SiteID
+                            final_ba_SiteId = ba_SiteId
             arcpy.Delete_management("temp_view")
             arcpy.MakeTableView_management(tmp_barrier, "temp_view")
-            arcpy.SelectLayerByAttribute_management("temp_view", "NEW_SELECTION", f"SiteId = '{final_ba_SiteID}'")
+            arcpy.SelectLayerByAttribute_management("temp_view", "NEW_SELECTION", f"SiteId = '{final_ba_SiteId}'")
             arcpy.SelectLayerByAttribute_management("temp_view", "SWITCH_SELECTION")
             arcpy.DeleteRows_management("temp_view")
-            with arcpy.da.SearchCursor("temp_view", ['SiteID', 'FishPass']) as cursor:
+            with arcpy.da.SearchCursor("temp_view", ['SiteId', 'FishPass']) as cursor:
                 for row in cursor:
                     lstDownBarriers_m.append(f"{row[0]} ({get_barrier_type(row[1])})")
             arcpy.Delete_management("temp_view")
@@ -321,14 +320,14 @@ def trace_upstream(TC_Network, start_point, barrier_layer, lstUpBarriers_m, dict
                                         append_barrier(lyr, tmp_barrier)
                                     cnt_barriers += int(arcpy.management.GetCount(lyr)[0])
                             elif lyr.name == stream_name:
-                                with arcpy.da.SearchCursor(lyr, ['StreamOrder', 'Shape_length']) as cursor:
+                                with arcpy.da.SearchCursor(lyr, ['STREAMORDER', 'Shape_Length']) as cursor:
                                     for row in cursor:
                                         lstUpStreamIDs.append(row[0])
                                         lstUpStreams.append((row[0],row[1]))
         if cnt_barriers == 0:
             return lstUpBarriers_m, dictSegBarrierIDs_m
         elif cnt_barriers == 1:
-            with arcpy.da.SearchCursor(tmp_barrier, ['SiteID', 'FishPass']) as cursor:
+            with arcpy.da.SearchCursor(tmp_barrier, ['SiteId', 'FishPass']) as cursor:
                 for row in cursor:
                     ba_type = get_barrier_type(row[1])
                     lstUpBarriers_m.append(f"{row[0]} ({ba_type})")
@@ -340,29 +339,29 @@ def trace_upstream(TC_Network, start_point, barrier_layer, lstUpBarriers_m, dict
                 return trace_upstream(TC_Network, start_p, barriers_fc, lstUpBarriers_m, dictSegBarrierIDs_m)
         else:
             smallest_river_order = None
-            final_ba_SiteID = ''
+            final_ba_SiteId = ''
             final_ba_Type = ''
-            ba_SiteIDs = []
+            ba_SiteIds = []
             seg_ids_remove = []
-            with arcpy.da.SearchCursor(tmp_barrier, ["SiteID", "FishPass"]) as ba_cursor:
+            with arcpy.da.SearchCursor(tmp_barrier, ["SiteId", "FishPass"]) as ba_cursor:
                 for ba in ba_cursor:
-                    ba_SiteIDs.append(ba[0])
-            for ba_SiteID in ba_SiteIDs:
+                    ba_SiteIds.append(ba[0])
+            for ba_SiteId in ba_SiteIds:
                 arcpy.management.MakeFeatureLayer(tmp_barrier, "temp_view")
-                arcpy.management.SelectLayerByAttribute("temp_view", 'NEW_SELECTION', f"SiteId = '{ba_SiteID}'")
+                arcpy.management.SelectLayerByAttribute("temp_view", 'NEW_SELECTION', f"SiteId = '{ba_SiteId}'")
                 arcpy.management.SelectLayerByLocation(lyr_stream_end, "INTERSECT", "temp_view")
                 with arcpy.da.SearchCursor(lyr_stream_end, ["STREAMORDER"]) as river_cursor:
                     for river in river_cursor:
                         river_order = river[0]
                         if smallest_river_order is None or river_order < smallest_river_order:
                             smallest_river_order = river_order
-                            final_ba_SiteID = ba_SiteID
+                            final_ba_SiteId = ba_SiteId
             arcpy.Delete_management("temp_view")
             arcpy.MakeTableView_management(tmp_barrier, "temp_view")
-            arcpy.SelectLayerByAttribute_management("temp_view", "NEW_SELECTION", f"SiteId = '{final_ba_SiteID}'")
+            arcpy.SelectLayerByAttribute_management("temp_view", "NEW_SELECTION", f"SiteId = '{final_ba_SiteId}'")
             arcpy.SelectLayerByAttribute_management("temp_view", "SWITCH_SELECTION")
             arcpy.DeleteRows_management("temp_view")
-            with arcpy.da.SearchCursor("temp_view", ['SiteID', 'FishPass']) as cursor:
+            with arcpy.da.SearchCursor("temp_view", ['SiteId', 'FishPass']) as cursor:
                 for row in cursor:
                     print(f"greater than 2: {row[0]} ({get_barrier_type(row[1])})")
                     lstUpBarriers_m.append(f"{row[0]} ({get_barrier_type(row[1])})")
@@ -400,7 +399,7 @@ def get_downstream_barrier(TC_Network, start_point, barrier_layer):
                                         append_barrier(lyr, tmp_barrier)
                                     cnt_barriers += int(arcpy.management.GetCount(lyr)[0])
                             elif lyr.name == stream_name:
-                                with arcpy.da.SearchCursor(lyr, ['StreamOrder', 'Shape_length']) as cursor:
+                                with arcpy.da.SearchCursor(lyr, ['STREAMORDER', 'Shape_Length']) as cursor:
                                     for row in cursor:
                                         if row[0] in UniqueDownstreamSegs:
                                             lstDownStreamIDs.append(row[0])
@@ -408,7 +407,7 @@ def get_downstream_barrier(TC_Network, start_point, barrier_layer):
         if cnt_barriers == 0:
             return 
         elif cnt_barriers == 1:
-            with arcpy.da.SearchCursor(tmp_barrier, ['SiteID', 'FishPass']) as cursor:
+            with arcpy.da.SearchCursor(tmp_barrier, ['SiteId', 'FishPass']) as cursor:
                 for row in cursor:
                     lstDownBarriers.append(f"{row[0]} ({get_barrier_type(row[1])})")
                     dict_streamlen_by_barrier [row[0]] = sum(tup[1] for tup in lstDownStreams)
@@ -416,16 +415,16 @@ def get_downstream_barrier(TC_Network, start_point, barrier_layer):
             return get_downstream_barrier(TC_Network, start_p, barriers_fc)
         else:
             smallest_river_order = None
-            final_ba_SiteID = ''
+            final_ba_SiteId = ''
             final_ba_Type = ''
-            ba_SiteIDs = []
+            ba_SiteIds = []
             seg_ids_remove = []
-            with arcpy.da.SearchCursor(tmp_barrier, ["SiteID", "FishPass"]) as ba_cursor:
+            with arcpy.da.SearchCursor(tmp_barrier, ["SiteId", "FishPass"]) as ba_cursor:
                 for ba in ba_cursor:
-                    ba_SiteIDs.append(ba[0])
-            for ba_SiteID in ba_SiteIDs:
+                    ba_SiteIds.append(ba[0])
+            for ba_SiteId in ba_SiteIds:
                 arcpy.management.MakeFeatureLayer(tmp_barrier, "temp_view")
-                arcpy.management.SelectLayerByAttribute("temp_view", 'NEW_SELECTION', f"SiteId = '{ba_SiteID}'")
+                arcpy.management.SelectLayerByAttribute("temp_view", 'NEW_SELECTION', f"SiteId = '{ba_SiteId}'")
                 arcpy.management.SelectLayerByLocation(lyr_stream_end, "INTERSECT", "temp_view")
                 with arcpy.da.SearchCursor(lyr_stream_end, ["STREAMORDER"]) as river_cursor:
                     for river in river_cursor:
@@ -434,15 +433,15 @@ def get_downstream_barrier(TC_Network, start_point, barrier_layer):
                             if not smallest_river_order is None:
                                 seg_ids_remove.append(smallest_river_order)
                             smallest_river_order = river_order
-                            final_ba_SiteID = ba_SiteID
+                            final_ba_SiteId = ba_SiteId
                         else:
                             seg_ids_remove.append(smallest_river_order)
             arcpy.Delete_management("temp_view")
             arcpy.MakeTableView_management(tmp_barrier, "temp_view")
-            arcpy.SelectLayerByAttribute_management("temp_view", "NEW_SELECTION", f"SiteId = '{final_ba_SiteID}'")
+            arcpy.SelectLayerByAttribute_management("temp_view", "NEW_SELECTION", f"SiteId = '{final_ba_SiteId}'")
             arcpy.SelectLayerByAttribute_management("temp_view", "SWITCH_SELECTION")
             arcpy.DeleteRows_management("temp_view")
-            with arcpy.da.SearchCursor("temp_view", ['SiteID', 'FishPass']) as cursor:
+            with arcpy.da.SearchCursor("temp_view", ['SiteId', 'FishPass']) as cursor:
                 for row in cursor:
                     lstDownBarriers.append(f"{row[0]} ({get_barrier_type(row[1])})")
             arcpy.Delete_management("temp_view")
@@ -590,7 +589,7 @@ def final_tracing(TC_Network, start_point, barrier_layer, barrier_id):
                 dn_barriers_t = dict_barriers_by_start[start_seg]
                 dn_barriers = [item for item in dn_barriers_t if barrier_id not in item]
         elif cnt_barriers == 1:
-            with arcpy.da.SearchCursor(tmp_barrier, ['SiteID']) as cursor:
+            with arcpy.da.SearchCursor(tmp_barrier, ['SiteId']) as cursor:
                 for row in cursor:
                     first_up_barrier = row[0]
             split_result = get_UP_barriers(barriers_by_trace, first_up_barrier)
@@ -612,20 +611,20 @@ def final_tracing(TC_Network, start_point, barrier_layer, barrier_id):
                 dn_barriers = [item for item in dn_barriers_t if barrier_id not in item]
         else:
             smallest_river_order = None
-            ba_SiteIDs = []
-            with arcpy.da.SearchCursor(tmp_barrier, ["SiteID"]) as ba_cursor:
+            ba_SiteIds = []
+            with arcpy.da.SearchCursor(tmp_barrier, ["SiteId"]) as ba_cursor:
                 for ba in ba_cursor:
-                    ba_SiteIDs.append(ba[0])
-            for ba_SiteID in ba_SiteIDs:
+                    ba_SiteIds.append(ba[0])
+            for ba_SiteId in ba_SiteIds:
                 arcpy.management.MakeFeatureLayer(tmp_barrier, "temp_view")
-                arcpy.management.SelectLayerByAttribute("temp_view", 'NEW_SELECTION', f"SiteId = '{ba_SiteID}'")
+                arcpy.management.SelectLayerByAttribute("temp_view", 'NEW_SELECTION', f"SiteId = '{ba_SiteId}'")
                 arcpy.management.SelectLayerByLocation(lyr_stream_end, "INTERSECT", "temp_view")
                 with arcpy.da.SearchCursor(lyr_stream_end, ["STREAMORDER"]) as river_cursor:
                     for river in river_cursor:
                         river_order = river[0]
                         if smallest_river_order is None or river_order < smallest_river_order:
                             smallest_river_order = river_order
-                            first_up_barrier = ba_SiteID
+                            first_up_barrier = ba_SiteId
             up_barriers_t, dn_barriers_t = get_UP_barriers(barriers_by_trace, first_up_barrier)
             up_barriers_f = [item for item in up_barriers_t if barrier_id not in item]
             dn_barriers = [item for item in dn_barriers_t if barrier_id not in item]
@@ -777,11 +776,11 @@ with open(csv_path, mode="w", newline="") as file:
             where_clause = f"OBJECTID = {OID}"
             arcpy.conversion.ExportFeatures(structure_layer, start_p, where_clause)
 
-            with arcpy.da.SearchCursor(structure_layer, [id_field, 'Barrier_SiteID'], where_clause) as cursor:
+            with arcpy.da.SearchCursor(structure_layer, [id_field, 'Barrier_SiteId'], where_clause) as cursor:
                 for row in cursor:
                     structureID = row[0]
-                    barrierSiteID = row[1]
-            up_barriers_final, dn_barriers_final, up_length = final_tracing(TC_Network, start_p, lyr_barriers_fc, barrierSiteID)
+                    barrierSiteId = row[1]
+            up_barriers_final, dn_barriers_final, up_length = final_tracing(TC_Network, start_p, lyr_barriers_fc, barrierSiteId)
 
             ##-- 1. list of Barriers 
             UP_Barriers = " -> ".join(up_barriers_final)
