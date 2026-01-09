@@ -113,16 +113,21 @@ def query_downstream_segs(starting_segs):
             DownstreamSegs.append(seg)
             arcpy.management.SelectLayerByAttribute(lyr_stream_end, "NEW_SELECTION", f"STREAMORDER = {seg}")
             arcpy.SelectLayerByLocation_management(lyr_stream_start, "INTERSECT", lyr_stream_end)
-            #print(arcpy.management.GetCount(lyr_stream_start)[0])
             while trace:
-                if int(arcpy.management.GetCount(lyr_stream_start)[0]) == 0:
+                count_start = int(arcpy.management.GetCount(lyr_stream_start)[0])
+                if count_start == 0:
                     trace = False
-                elif int(arcpy.management.GetCount(lyr_stream_start)[0]) == 1:
+                elif count_start == 1:
+                    last_order = None
                     with arcpy.da.SearchCursor(lyr_stream_start, ["STREAMORDER"]) as river_cursor:
                         for river in river_cursor:
-                            DownstreamSegs.append(river[0])
-                    arcpy.management.SelectLayerByAttribute(lyr_stream_end, "NEW_SELECTION", f"STREAMORDER = {river[0]}")
-                    arcpy.SelectLayerByLocation_management(lyr_stream_start, "INTERSECT", lyr_stream_end)
+                            last_order = river[0]
+                            DownstreamSegs.append(last_order)
+                    if last_order is None:
+                        trace = False
+                    else:
+                        arcpy.management.SelectLayerByAttribute(lyr_stream_end, "NEW_SELECTION", f"STREAMORDER = {last_order}")
+                        arcpy.SelectLayerByLocation_management(lyr_stream_start, "INTERSECT", lyr_stream_end)
                 else:
                     smallest_river_order = None
                     with arcpy.da.SearchCursor(lyr_stream_start, ["STREAMORDER"]) as river_cursor:
@@ -130,9 +135,12 @@ def query_downstream_segs(starting_segs):
                             river_order = river[0]
                             if smallest_river_order is None or river_order < smallest_river_order:
                                 smallest_river_order = river_order
-                    DownstreamSegs.append(smallest_river_order)
-                    arcpy.management.SelectLayerByAttribute(lyr_stream_end, "NEW_SELECTION", f"STREAMORDER = {river[0]}")
-                    arcpy.SelectLayerByLocation_management(lyr_stream_start, "INTERSECT", lyr_stream_end)
+                    if smallest_river_order is None:
+                        trace = False
+                    else:
+                        DownstreamSegs.append(smallest_river_order)
+                        arcpy.management.SelectLayerByAttribute(lyr_stream_end, "NEW_SELECTION", f"STREAMORDER = {smallest_river_order}")
+                        arcpy.SelectLayerByLocation_management(lyr_stream_start, "INTERSECT", lyr_stream_end)
         DownstreamSegs = set(DownstreamSegs)
         return DownstreamSegs
     except Exception as e:
@@ -410,13 +418,12 @@ def get_downstream_barrier(TC_Network, start_point, barrier_layer):
             with arcpy.da.SearchCursor(tmp_barrier, ['SiteId', 'FishPass']) as cursor:
                 for row in cursor:
                     lstDownBarriers.append(f"{row[0]} ({get_barrier_type(row[1])})")
-                    dict_streamlen_by_barrier [row[0]] = sum(tup[1] for tup in lstDownStreams)
+                    dict_streamlen_by_barrier[row[0]] = sum(tup[1] for tup in lstDownStreams)
             arcpy.conversion.ExportFeatures(tmp_barrier, start_p)
             return get_downstream_barrier(TC_Network, start_p, barriers_fc)
         else:
             smallest_river_order = None
             final_ba_SiteId = ''
-            final_ba_Type = ''
             ba_SiteIds = []
             seg_ids_remove = []
             with arcpy.da.SearchCursor(tmp_barrier, ["SiteId", "FishPass"]) as ba_cursor:
@@ -434,8 +441,6 @@ def get_downstream_barrier(TC_Network, start_point, barrier_layer):
                                 seg_ids_remove.append(smallest_river_order)
                             smallest_river_order = river_order
                             final_ba_SiteId = ba_SiteId
-                        else:
-                            seg_ids_remove.append(smallest_river_order)
             arcpy.Delete_management("temp_view")
             arcpy.MakeTableView_management(tmp_barrier, "temp_view")
             arcpy.SelectLayerByAttribute_management("temp_view", "NEW_SELECTION", f"SiteId = '{final_ba_SiteId}'")
@@ -446,7 +451,9 @@ def get_downstream_barrier(TC_Network, start_point, barrier_layer):
                     lstDownBarriers.append(f"{row[0]} ({get_barrier_type(row[1])})")
             arcpy.Delete_management("temp_view")
             lstDownStreams_f = [tup for tup in lstDownStreams if not (tup[0] in set(seg_ids_remove))]
-            dict_streamlen_by_barrier [row[0]] = sum(tup[1] for tup in lstDownStreams_f)
+            # assign stream length to the site selected as final_ba_SiteId
+            if final_ba_SiteId:
+                dict_streamlen_by_barrier[final_ba_SiteId] = sum(tup[1] for tup in lstDownStreams_f)
             arcpy.conversion.ExportFeatures(tmp_barrier, start_p)
             return get_downstream_barrier(TC_Network, start_p, barriers_fc)
     except Exception as e:
@@ -490,48 +497,44 @@ def append_barrier(input_fc, output_fc):
 
 def get_layer_name(ba_path):
     try:
-        ba_name = ba_path.split("\\")[-1]
-        return ba_name
+        # more robust extraction of the final path component or layer name
+        return os.path.basename(ba_path)
     except Exception as e:
         arcpy.AddError("Error getting layer name: {0}.".format(e))
-    
+
 
 def get_barrier_type(fishpass):
     try:
-        ba_type = ''
-        if fishpass == None or fishpass.strip() == '':
-            ba_type = 'Natural Barrier'
-        elif fishpass == '0':
-            ba_type = 'Full Barrier'
-        elif fishpass == '100':
-            ba_type = 'No Barrier'
-        elif fishpass.strip().upper() == 'UNKNOWN':
-            ba_type = 'Unknown Barrier'
-        else:
-            ba_type = 'Partial Barrier'
-        return ba_type
+        if fishpass is None:
+            return 'Natural Barrier'
+        fp = str(fishpass).strip()
+        if fp == '':
+            return 'Natural Barrier'
+        if fp == '0':
+            return 'Full Barrier'
+        if fp == '100':
+            return 'No Barrier'
+        if fp.upper() == 'UNKNOWN':
+            return 'Unknown Barrier'
+        return 'Partial Barrier'
     except Exception as e:
         arcpy.AddError("Error getting barrier type: {0}.".format(e))
 
 
 def get_barrier_count(lstBarriers):
     try:
-        cntFull = 0
-        cntPartial = 0
-        cntNO = 0
-        cntNB = 0
-        cntUB = 0
+        cntFull = cntPartial = cntNO = cntNB = cntUB = 0
         for ba in lstBarriers:
             if 'Full' in ba:
                 cntFull += 1
             elif 'Partial' in ba:
                 cntPartial += 1
-            elif 'No ' in ba:
+            elif 'No Barrier' in ba:
                 cntNO += 1
             elif 'Natural' in ba:
-                cntNB +=1
+                cntNB += 1
             elif 'Unknown' in ba:
-                cntUB +=1
+                cntUB += 1
         return cntFull, cntPartial, cntNO, cntNB, cntUB
     except Exception as e:
         arcpy.AddError("Error getting barrier counts: {0}.".format(e))
@@ -549,7 +552,7 @@ def calculate_channel_length(barrier_list, dict_length_ba):
 def get_structure_ids(feature_class):
     try:
         layer_name = arcpy.Describe(feature_class).name
-        ids = [row[0] for row in arcpy.da.SearchCursor(feature_class, "OBJECTID")]
+        ids = [row[0] for row in arcpy.da.SearchCursor(feature_class, ["OBJECTID"])]
         return {"Layer Name": layer_name, "OIDs": ids}
     except Exception as e:
         arcpy.AddError("Error getting structure ids: {0}.".format(e))
